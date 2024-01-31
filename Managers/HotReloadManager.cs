@@ -2,6 +2,8 @@
 using CustomAlbums.Utilities;
 using HarmonyLib;
 using Il2CppAssets.Scripts.Database;
+using Il2CppAssets.Scripts.PeroTools.Commons;
+using Il2CppAssets.Scripts.PeroTools.Managers;
 using Il2CppAssets.Scripts.UI.Panels;
 
 namespace CustomAlbums.Managers
@@ -44,37 +46,24 @@ namespace CustomAlbums.Managers
             AssetPatch.RemoveFromCache($"album_{albumName}_music");
             AssetPatch.RemoveFromCache($"album_{albumName}_cover");
 
-            // Get the music info from the UID, remove it from the ShowMusic list, and refresh the UI
+            // Get the music info from the UID and remove it from ALBUM1000 (custom albums)
             var musicInfo = GlobalDataBase.s_DbMusicTag.GetMusicInfoFromAll($"{AlbumManager.Uid}-{album.Index}");
+            var customAlbumsTag = GlobalDataBase.dbMusicTag.GetAlbumTagInfo(AlbumManager.Uid);
+            customAlbumsTag.musicUids.Remove($"{AlbumManager.Uid}-{album.Index}");
+            var configAlbum = Singleton<ConfigManager>.instance.GetConfigObject<DBConfigALBUM>(AlbumManager.Uid + 1);
+            configAlbum.m_Items.Remove(musicInfo); 
+            
+            // Remove the musicInfo from the ShowMusic list, and refresh the UI
             GlobalDataBase.s_DbMusicTag.RemoveShowMusicUid(musicInfo);
             PnlStageInstance.m_MusicRootAnimator?.Play(PnlStageInstance.animNameAlbumIn);
             PnlStageInstance.RefreshMusicFSV();
 
-            // TODO: Remove the album information from the Custom Albums tag menu
-
-            // TODO: Only change the selected album if the selected album was the album that was deleted
             Logger.Msg("Successfully removed from cache!");
-        }
-
-        private static void RenameAllCachedAssets(string oldAlbumName, string newAlbumName)
-        {
-            Logger.Msg($"Renaming {oldAlbumName} to {newAlbumName}!");
-            var success = AlbumManager.LoadedAlbums.Remove(oldAlbumName, out var album);
-            if (!success) return;
-
-            // rename the assets to the new name
-            AlbumManager.LoadedAlbums.TryAdd(newAlbumName, album);
-            AssetPatch.ModifyCacheKey($"{oldAlbumName}_demo", $"{newAlbumName}_demo");
-            AssetPatch.ModifyCacheKey($"{oldAlbumName}_music", $"{newAlbumName}_music");
-            AssetPatch.ModifyCacheKey($"{oldAlbumName}_cover", $"{newAlbumName}_cover");
-
-            Logger.Msg("Successfully modified cache!");
         }
 
         private static void AddNewAlbums(int previousSize)
         {
-            var index = previousSize;
-            for (var i = previousSize; i < AlbumManager.LoadedAlbums.Count; i++)
+            for (; previousSize < AlbumManager.LoadedAlbums.Count; previousSize++)
             {
                 // TODO: Write added album hot reloading logic here
             }
@@ -113,12 +102,6 @@ namespace CustomAlbums.Managers
             {
                 Logger.Msg("Deleted file " + e.Name);
                 AlbumsDeleted.Enqueue(Path.GetFileNameWithoutExtension(e.Name));
-            };
-            AlbumManager.AlbumWatcher.Renamed += (s, e) =>
-            {
-                Logger.Msg("Renamed file " + e.OldName + " -> " + e.Name);
-                RenameAllCachedAssets($"album_{Path.GetFileNameWithoutExtension(e.OldName)}",
-                    $"album_{Path.GetFileNameWithoutExtension(e.Name)}");
             };
 
             // Start the AlbumWatcher
