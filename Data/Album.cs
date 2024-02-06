@@ -74,6 +74,7 @@ namespace CustomAlbums.Data
                 catch (IOException)
                 {
                     // this is expected in the case of deleting an album
+                    return false;
                 }
             }
 
